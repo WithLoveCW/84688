@@ -191,7 +191,7 @@
   id="friendName"
   name="friendName"
   type="text"
-  placeholder="Charlotte"
+  placeholder="Enter their name"
   required
 />
 
@@ -319,10 +319,40 @@
   return getBasePath() + "bridesmaid-form.html";
 }
 
-    async function loadEditMode() {
+   async function loadEditMode() {
   if (!editToken) return;
-}
 
+  pageTitle.textContent = "Edit Your Reveal";
+  introText.textContent =
+    "Update the name or upload a new photo below.";
+  submitButton.textContent = "Save My Changes";
+
+  const { data, error } = await supabaseClient
+    .from("bridesmaid-design1")
+    .select("*")
+    .eq("edit_token", editToken)
+    .single();
+
+  if (error || !data) {
+    form.style.display = "none";
+    lockedBox.style.display = "block";
+    return;
+  }
+
+  const now = new Date();
+  const lockedAfter = new Date(data.locked_after);
+
+  if (now > lockedAfter) {
+    form.style.display = "none";
+    lockedBox.style.display = "block";
+    return;
+  }
+
+  editingRevealId = data.id;
+
+  document.getElementById("friendName").value =
+    data.friend_name || "";
+}
 form.addEventListener("submit", async function(event) {
   event.preventDefault();
 
