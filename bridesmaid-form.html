@@ -202,7 +202,7 @@
    <label for="friendPhoto">Upload a photo</label>
         <input
           id="friendPhoto"
-          name="friendPhotoe"
+          name="friendPhoto"
           type="file"
           accept="image/*"
         />
@@ -308,199 +308,94 @@
 }
 
     async function loadEditMode() {
-      if (!editToken) return;
+  if (!editToken) return;
+}
 
-      pageTitle.textContent = "Edit Your Reveal";
-      introText.textContent =
-        "You can update your personalised wording below if you are still within your 24-hour edit window.";
-      submitButton.textContent = "Save My Changes";
+form.addEventListener("submit", async function(event) {
+  event.preventDefault();
 
-      const { data, error } = await supabaseClient
-        .from("gender-design1")
-        .select("*")
-        .eq("edit_token", editToken)
-        .single();
+  const friendName =
+    document.getElementById("friendName").value.trim();
 
-      if (error || !data) {
-        form.style.display = "none";
-        lockedBox.style.display = "block";
-        return;
-      }
+  const friendPhotoFile =
+    document.getElementById("friendPhoto").files[0];
 
-      const now = new Date();
-      const lockedAfter = new Date(data.locked_after);
+  let photoUrl = null;
 
-      if (now > lockedAfter) {
-        form.style.display = "none";
-        lockedBox.style.display = "block";
-        return;
-      }
+  if (friendPhotoFile) {
+    const fileExt =
+      friendPhotoFile.name.split(".").pop();
 
-      editingRevealId = data.id;
+    const fileName =
+      `${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2)}.${fileExt}`;
 
-      document.getElementById("babyName").value =
-        data.baby_name || "";
+    const { error: uploadError } =
+      await supabaseClient.storage
+        .from("bridesmaid-photos")
+        .upload(fileName, friendPhotoFile);
 
-      document.getElementById("dueDate").value =
-        data.due_date || "";
-
-      document.getElementById("message").value =
-        data.message || "";
+    if (uploadError) {
+      alert("Image upload failed. Please try again.");
+      console.error(uploadError);
+      return;
     }
 
-    form.addEventListener("submit", async function(event) {
-      event.preventDefault();
+    const { data: publicUrlData } =
+      supabaseClient.storage
+        .from("bridesmaid-photos")
+        .getPublicUrl(fileName);
 
-      const babyName =
-        document.getElementById("babyName").value.trim();
+    photoUrl =
+      publicUrlData.publicUrl;
+  }
 
-      const dueDate =
-        document.getElementById("dueDate").value.trim();
+  const id = createUniqueId();
+  const newEditToken = createEditToken();
 
-      const message =
-        document.getElementById("message").value.trim();
+  const lockedAfter = new Date();
+  lockedAfter.setHours(lockedAfter.getHours() + 24);
 
-      const ultrasoundFile =
-        document.getElementById("ultrasoundImage").files[0];
-
-      let ultrasoundUrl = null;
-
-      if (ultrasoundFile) {
-        const fileExt =
-          ultrasoundFile.name.split(".").pop();
-
-        const fileName =
-          `${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2)}.${fileExt}`;
-
-        const { error: uploadError } =
-          await supabaseClient.storage
-            .from("ultrasounds")
-            .upload(fileName, ultrasoundFile);
-
-        if (uploadError) {
-          alert("Image upload failed. Please try again.");
-          console.error(uploadError);
-          return;
-        }
-
-        const { data: publicUrlData } =
-          supabaseClient.storage
-            .from("ultrasounds")
-            .getPublicUrl(fileName);
-
-        ultrasoundUrl =
-          publicUrlData.publicUrl;
+  const { error } = await supabaseClient
+    .from("bridesmaid-design1")
+    .insert([
+      {
+        id: id,
+        friend_name: friendName,
+        photo_url: photoUrl,
+        edit_token: newEditToken,
+        locked_after: lockedAfter.toISOString()
       }
+    ]);
 
-      if (editToken && editingRevealId) {
-        const updateData = {
-          baby_name: babyName,
-          due_date: dueDate,
-          message: message
-        };
+  if (error) {
+    alert("Something went wrong. Please try again.");
+    console.error(error);
+    return;
+  }
 
-        if (ultrasoundUrl) {
-          updateData.ultrasound_url = ultrasoundUrl;
-        }
+  const finalLink =
+    window.location.origin +
+    getRevealPagePath() +
+    "?id=" +
+    id;
 
-        const { error } = await supabaseClient
-          .from("gender-design1")
-          .update(updateData)
-          .eq("id", editingRevealId)
-          .eq("edit_token", editToken);
+  const finalEditLink =
+    window.location.origin +
+    getFormPagePath() +
+    "?edit=" +
+    newEditToken;
 
-        if (error) {
-          alert("Something went wrong. Please try again.");
-          console.error(error);
-          return;
-        }
+  revealLink.href = finalLink;
+  revealLink.textContent = finalLink;
 
-        const finalLink =
-          window.location.origin +
-          getRevealPagePath() +
-          "?id=" +
-          editingRevealId +
-          "&updated=" +
-          Date.now();
+  editLink.href = finalEditLink;
+  editLink.textContent = finalEditLink;
 
-        const finalEditLink =
-          window.location.origin +
-          getFormPagePath() +
-          "?edit=" +
-          editToken;
-
-        revealLink.href = finalLink;
-        revealLink.textContent = finalLink;
-
-        editLink.href = finalEditLink;
-        editLink.textContent = finalEditLink;
-
-        document.getElementById("editSection").style.display =
-          "block";
-
-        resultBox.querySelector("h2").textContent =
-          "Your changes have been saved!";
-
-        resultBox.querySelector("p").innerHTML =
-          "<strong>Share this updated reveal link with friends & family:</strong>";
-
-        resultBox.style.display = "block";
-        form.style.display = "none";
-
-        return;
-      }
-
-      const id = createUniqueId();
-      const newEditToken = createEditToken();
-
-      const lockedAfter = new Date();
-      lockedAfter.setHours(lockedAfter.getHours() + 24);
-
-      const { error } = await supabaseClient
-        .from("gender-design1")
-        .insert([
-          {
-            id: id,
-            baby_name: babyName,
-            due_date: dueDate,
-            message: message,
-            ultrasound_url: ultrasoundUrl,
-            edit_token: newEditToken,
-            locked_after: lockedAfter.toISOString()
-          }
-        ]);
-
-      if (error) {
-        alert("Something went wrong. Please try again.");
-        console.error(error);
-        return;
-      }
-
-      const finalLink =
-        window.location.origin +
-        getRevealPagePath() +
-        "?id=" +
-        id;
-
-      const finalEditLink =
-        window.location.origin +
-        getFormPagePath() +
-        "?edit=" +
-        newEditToken;
-
-      revealLink.href = finalLink;
-      revealLink.textContent = finalLink;
-
-      editLink.href = finalEditLink;
-      editLink.textContent = finalEditLink;
-
-      resultBox.style.display = "block";
-      form.style.display = "none";
-    });
-
-    copyButton.addEventListener("click", async function() {
+  resultBox.style.display = "block";
+  form.style.display = "none";
+});
       await navigator.clipboard.writeText(revealLink.href);
       copyButton.textContent = "Copied!";
     });
