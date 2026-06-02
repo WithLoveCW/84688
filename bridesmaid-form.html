@@ -304,7 +304,7 @@
     }
 
    function getFormPagePath() {
-  return getBasePath() + "girl-form.html";
+  return getBasePath() + "bridesmaid-form.html";
 }
 
     async function loadEditMode() {
@@ -396,10 +396,11 @@ form.addEventListener("submit", async function(event) {
   resultBox.style.display = "block";
   form.style.display = "none";
 });
-      await navigator.clipboard.writeText(revealLink.href);
-      copyButton.textContent = "Copied!";
-    });
 
+copyButton.addEventListener("click", async function() {
+  await navigator.clipboard.writeText(revealLink.href);
+  copyButton.textContent = "Copied!";
+});
     copyEditButton.addEventListener("click", async function() {
       await navigator.clipboard.writeText(editLink.href);
       copyEditButton.textContent = "Copied!";
